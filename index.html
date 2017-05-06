@@ -1,0 +1,86 @@
+<script type="text/javascript" async
+  src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+
+<h2>Overview</h2>
+
+We divide the screen into a grid and keep arrays of velocity and density values to update at every time step. The value in the density array determines the color of each cell. We update the densities using the equation for density moving in a velocity field, which has a term for diffusion, new mass entering the system, and density carried by the velocity. Thus, we need to update the velocity every time step using Navier-Stokes. To do this, we use Chopin's projection method, which calculates an intermediate velocity by ignoring the pressure term in the Navier-Stokes equation then uses this intermediate velocity to calculate the pressure and uses these values to calculate the final velocity. By calculating the velocity and updating the densities using this velocity at each time step, we can simulate fluid flow.
+
+<h2>Variables</h2>
+<p>We keep an array for the following for every cell in our grid: density, density of previous time step, velocity, velocity of previous time step, pressure.</p>
+
+<h2>Density Computation</h2>
+$$\frac{\partial{\rho}}{\partial{t}} = -(u\cdot \nabla)\rho + \kappa \nabla ^2\rho + S$$
+
+<p>The equation is conservation of density for flow through a velocity field.</p>
+<p>The first term states that the density follows some velocity field. For every point in our grid, we take the velocity at that point and trace it back one time step. We then linearly interpolate the densities of the four closest cells to this point.</p>
+<p>The second term is the diffusion term, which can be modeled by taking the previous density array and adding the net gain from surrounding cells.</p>
+<p>The third term is the soure term, which is just new mass entering the system, which can be added to the corresponding index of the density array.</p>
+
+<h2>Velocity Computation</h2>
+$$\frac{\partial{u}}{\partial{t}} = -(u\cdot \nabla)u + \nu \nabla ^2u + f + \frac{1}{\rho}\nabla p$$
+
+We need to evolve the velocity that's used in the density equation.
+
+The third term is change in velocity due to external forces, which can be modeled by simply adding to the corresponding cells.
+
+The second term is viscous diffusion, which can be solved the same way 
+as diffusion of density.
+
+<!-- The incompressible Navier-Stokes equation is
+$$\frac{\partial{u}}{\partial{t}} = -(u\cdot \nabla)u - \frac{1}{\rho}\nabla p + \nu \nabla^2u$$ -->
+We can calculate the intermediate velocity, $v^*$, which represents the velocity without the pressure term accounted for. Thus, we have the following equation to account for this term:
+$$\frac{u^{n+1}-u^*}{\Delta t} + \frac{\nabla p^{n+1}}{\rho} = 0$$
+Taking the divergence of this equation and using the fact that \(\nabla \cdot u^{n+1} = 0\)
+for mass to be conserved leads to, we get
+$$\nabla \cdot (\frac{\nabla p^{n+1}}{\rho}) = \frac{\nabla \cdot u^*}{\Delta t}$$
+which reduces to
+$$\nabla^2 \hat{p} = \nabla \cdot u^* \text{  where } \hat{p} = \frac{p\Delta t}{\rho}$$
+
+<p>For every cell in the grid, we compute the gradient of the velocity by taking the derivative in each direction by subtracting the velocities of the cells on either side and dividing by the width then summing them and use this to solve for pressure at every cell.</p>
+
+<p>Once we have pressure, we can use the following equation to solve for the velocity adjusted for conservation of mass.
+$$u^{n+1} = u^* - \frac{\Delta t}{\rho}\nabla p^{n+1}$$</p>
+
+<h2>Visualizing the Fluid</h2>
+<p>To visualize the calculated density field and velocity field, we approached the problem in the simplest possible way. We decided to take the density value which we controlled to be between 0 and 1 and linearly interpolate it with defaultColor and fluidColor. This worked perfectly even when default color had an alpha component, enabling us to create smoke simulation for games. We also found we can linearly interpolate multiple times between different colors to yield a fire-like effect.</p>
+
+<p>To make the smoke and fire simulation, Instead of having a set density value at start we thought of the ways in which we can add density and velocity value dynamically. Since we are taking the previous state and through a series of calculation predicting where the fluid would have flown to after that iteration, we found that we can add density to the grid we want the smoke and fire to originate from. We can also add a velocity in the direction we want them to propagate.</p>
+
+<h2>Description of Problems and Lessons Learned</h2>
+<p>Solving the Navier-Stokes equation was challenging because there's no existing solution for it. We had to look at various papers to find a way to estimate the solution. The hardest part was the math behind the code and understanding what the Navier-Stokes equation means physically to simplify it to a quick and efficient algorithm.</p>
+<p>	In fire simulation, adding density value to only a grid made the fire look very thin and unrealistic. We tried adding density value to a width x height grid. That made fire look larger that it has been but now the problem was that we had a square fire. We managed to solve the problem by for each point we are adding density to, calculate the distance away from the center of them. Then, use this value divided by half the width of the square (radius). The closer this value was to one, less density was added. When this value exceeded one, no density was added.</p>
+
+<p>Another problem in simulating fire and smoke was them looking very stoic and overly orderly when density and velocity were added to the same grid every iteration. We solved this problem by randomly varying the grid density and velocity are added to by a factor. That way we got a trembling and moving source and the resulting propagation was much more natural.</p>
+
+<p>We learned that there's a huge difference between understanding the algorithm in the paper and actually implementing it. We learned a lot about coding in Unity and about the governing equations that drive fluid flow. Through working on visualization of the project I learnt that it is important to try the simplest solution first then work my way up towards the more complex one if necessary. I often catch myself wanting to do the best and the most efficient on the first try and it more often than not turn out to be a level of complexity that I cannot handle on the first try. In this project, the simplest solutions happened to yield the best result. I think it is important for me to remember that there are cases like these and not aim for the ‘fanciest’ solution the first time.</p>
+
+
+<h2>Results</h2>
+<video width="50%" controls>
+  <source src="simulations.mp4" type="video/mp4">
+Your browser does not support the video tag.
+</video>
+
+<h2>References</h2>
+<ul>
+<li>https://en.wikipedia.org/wiki/Navier%E2%80%93Stokes_equations</li>
+<li>https://www.grc.nasa.gov/www/k-12/airplane/nseqs.html</li>
+<li>http://physbam.stanford.edu/~fedkiw/papers/stanford2001-01.pdf</li>
+<li>https://software.intel.com/en-us/articles/fluid-simulation-for-video-games-part-1</li>
+<li>http://www.dgp.toronto.edu/people/stam/reality/Research/pdf/GDC03.pdf</li>
+
+
+<h2>Contributions</h2>
+JuKyung was responsible for implementing the algorithm and Hye Min was responsible for all the visualization.
+
+<h2>Project Video</h2>
+
+<video width="50%" controls>
+  <source src="simulations.mp4" type="video/mp4">
+Your browser does not support the video tag.
+</video>
+<video width="50%" height = 50% controls>
+  <source src="video.mp4" type="video/mp4">
+Your browser does not support the video tag.
+</video>
